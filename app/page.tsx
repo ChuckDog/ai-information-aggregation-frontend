@@ -24,7 +24,7 @@ export default function Dashboard() {
 
   const fetchTasks = async () => {
     try {
-      const response = await api.get('/tasks');
+      const response = await api.get('/api/tasks');
       setTasks(response.data);
     } catch (error) {
       console.error('Failed to fetch tasks', error);
@@ -38,7 +38,7 @@ export default function Dashboard() {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this task?')) {
       try {
-        await api.delete(`/tasks/${id}`); // Assuming delete endpoint exists, if not need to add to backend
+        await api.delete(`/api/tasks/${id}`); // Assuming delete endpoint exists, if not need to add to backend
         setTasks(tasks.filter(t => t.id !== id));
       } catch (error) {
         console.error('Failed to delete task', error);
@@ -51,7 +51,7 @@ export default function Dashboard() {
       e.preventDefault();
       e.stopPropagation();
       try {
-          await api.post(`/tasks/${id}/execute`);
+          await api.post(`/api/tasks/${id}/execute`);
           alert('Task execution started');
           fetchTasks(); // Refresh status
       } catch (error) {

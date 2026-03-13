@@ -32,7 +32,7 @@ export default function NewTaskPage() {
             : [],
       };
 
-      await api.post('/tasks', formattedData);
+      await api.post('/api/tasks', formattedData);
       router.push('/');
     } catch (error) {
       console.error('Failed to create task', error);

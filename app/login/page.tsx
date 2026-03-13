@@ -27,33 +27,13 @@ export default function LoginPage() {
     setError('');
     try {
       const response = await api.post('/auth/login', data);
-      const { access_token } = response.data;
-      
-      // Fetch user profile after login
-      // For now, let's decode or fetch. 
-      // Assuming the backend returns the token, we can then fetch the profile.
-      // But for simplicity, we'll optimistically set the user or fetch profile immediately.
-      
-      // Let's manually set the token to cookie first in api call logic or here?
-      // The store handles cookie setting.
-      
-      // We need user details. Let's assume we can fetch profile with the new token.
-      // Or we can modify the backend to return user details on login.
-      // For now, let's just decode if possible, or fetch profile.
-      // Since we don't have jwt-decode, let's do a quick profile fetch with the token.
-      
-      // Wait, api interceptor needs the cookie. Store login sets the cookie.
-      // So we call login with a dummy user first or just token, then fetch profile?
-      // The store login expects a user object.
-      
-      // Let's update store to allow fetching or just passing what we have.
-      // Actually, let's just fetch the profile using the token in the header manually for this request.
+      const { access_token, refresh_token } = response.data;
       
       const profileResponse = await api.get('/auth/profile', {
         headers: { Authorization: `Bearer ${access_token}` }
       });
       
-      login(access_token, profileResponse.data);
+      login(access_token, refresh_token, profileResponse.data);
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
