@@ -6,7 +6,7 @@ export interface Task {
   keywords: string;
   instructions: string;
   config: any;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
   progress?: number;
   current_step?: string;
   createdAt: string;
