@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { useAuthStore } from '@/store/auth';
-import api from '@/lib/api';
-import { Lock, Mail } from 'lucide-react';
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { useAuthStore } from "@/store/auth";
+import api from "@/lib/api";
+import { Lock, Mail } from "lucide-react";
 
 interface LoginForm {
   email: string;
@@ -16,27 +16,31 @@ interface LoginForm {
 }
 
 export default function LoginPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginForm>();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
-    setError('');
+    setError("");
     try {
-      const response = await api.post('/auth/login', data);
+      const response = await api.post("/auth/login", data);
       const { access_token, refresh_token } = response.data;
-      
-      const profileResponse = await api.get('/auth/profile', {
-        headers: { Authorization: `Bearer ${access_token}` }
+
+      const profileResponse = await api.get("/auth/profile", {
+        headers: { Authorization: `Bearer ${access_token}` },
       });
-      
+
       login(access_token, refresh_token, profileResponse.data);
-      router.push('/');
+      router.push("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      setError(err.response?.data?.message || "Invalid email or password");
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +69,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="Email address"
                   className="pl-10"
-                  {...register('email', { required: 'Email is required' })}
+                  {...register("email", { required: "Email is required" })}
                   error={errors.email?.message}
                 />
               </div>
@@ -78,7 +82,9 @@ export default function LoginPage() {
                   type="password"
                   placeholder="Password"
                   className="pl-10"
-                  {...register('password', { required: 'Password is required' })}
+                  {...register("password", {
+                    required: "Password is required",
+                  })}
                   error={errors.password?.message}
                 />
               </div>
@@ -99,13 +105,15 @@ export default function LoginPage() {
                 Sign in
               </Button>
             </div>
-            
-             <div className="text-center mt-4">
-                <p className="text-sm text-gray-600">
-                  Default Accounts (Seed):<br/>
-                  Admin: admin@example.com / admin123<br/>
-                  Demo: demo@example.com / demo123
-                </p>
+
+            <div className="text-center mt-4">
+              <p className="text-sm text-gray-600">
+                Default Accounts (Seed):
+                <br />
+                Admin: admin@example.com / Abc1234!
+                <br />
+                Demo: demo@example.com / demo123
+              </p>
             </div>
           </form>
         </CardContent>

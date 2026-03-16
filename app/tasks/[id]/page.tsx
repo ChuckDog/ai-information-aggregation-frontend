@@ -36,9 +36,12 @@ import { Input } from "@/components/ui/Input";
 import api from "@/lib/api";
 import { Task, TaskResult } from "@/types";
 
+import { useAuthStore } from "@/store/auth";
+
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuthStore();
   const id = params.id as string;
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -361,11 +364,25 @@ export default function TaskDetailPage() {
 
                 {task.status === "running" ? (
                   <>
-                    <Button onClick={handlePause} variant="secondary">
+                    <Button
+                      onClick={handlePause}
+                      variant="secondary"
+                      disabled={!user?.isActive}
+                      title={
+                        !user?.isActive ? "Your account is inactive" : "Pause"
+                      }
+                    >
                       <PauseCircle className="h-4 w-4 mr-2" />
                       Pause
                     </Button>
-                    <Button onClick={handleStop} variant="danger">
+                    <Button
+                      onClick={handleStop}
+                      variant="danger"
+                      disabled={!user?.isActive}
+                      title={
+                        !user?.isActive ? "Your account is inactive" : "Stop"
+                      }
+                    >
                       <Square className="h-4 w-4 mr-2" />
                       Stop
                     </Button>
@@ -373,7 +390,10 @@ export default function TaskDetailPage() {
                 ) : (
                   <Button
                     onClick={handleExecute}
-                    disabled={task.status === "completed"}
+                    disabled={task.status === "completed" || !user?.isActive}
+                    title={
+                      !user?.isActive ? "Your account is inactive" : "Run Task"
+                    }
                   >
                     <Play className="h-4 w-4 mr-2" />
                     {task.status === "paused"
@@ -387,7 +407,16 @@ export default function TaskDetailPage() {
                 {task.status === "completed" &&
                   task.results &&
                   task.results.length > 0 && (
-                    <Button variant="secondary" onClick={handleStructure}>
+                    <Button
+                      variant="secondary"
+                      onClick={handleStructure}
+                      disabled={!user?.isActive}
+                      title={
+                        !user?.isActive
+                          ? "Your account is inactive"
+                          : "Structure Data"
+                      }
+                    >
                       <Settings className="h-4 w-4 mr-2" />
                       Structure Data
                     </Button>
@@ -396,7 +425,14 @@ export default function TaskDetailPage() {
                 {(task.status === "completed" ||
                   task.status === "failed" ||
                   task.status === "paused") && (
-                  <Button variant="secondary" onClick={handleRestart}>
+                  <Button
+                    variant="secondary"
+                    onClick={handleRestart}
+                    disabled={!user?.isActive}
+                    title={
+                      !user?.isActive ? "Your account is inactive" : "Restart"
+                    }
+                  >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Restart
                   </Button>

@@ -24,6 +24,14 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Skip redirect for profile check and refresh token requests as they are handled by auth store
+      if (
+        originalRequest.url?.includes('/auth/profile') ||
+        originalRequest.url?.includes('/auth/refresh')
+      ) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       // Try to refresh token here if possible, but for now we focus on logout
