@@ -28,12 +28,13 @@ import {
   Download,
   Copy,
   Check,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import api from "@/lib/api";
-import { Task } from "@/types";
+import { Task, TaskResult } from "@/types";
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -44,9 +45,14 @@ export default function TaskDetailPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isUrlsCollapsed, setIsUrlsCollapsed] = useState(false);
-  const [selectedResult, setSelectedResult] = useState<any | null>(null);
+  const [selectedResult, setSelectedResult] = useState<TaskResult | null>(null);
   const [copiedInstruction, setCopiedInstruction] = useState(false);
+  const [copiedStructuringInstruction, setCopiedStructuringInstruction] =
+    useState(false);
   const [copiedUrls, setCopiedUrls] = useState(false);
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<"list" | "table">("list");
 
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false);
@@ -54,6 +60,7 @@ export default function TaskDetailPage() {
     name: "",
     instructions: "",
     urls: "",
+    structuringInstructions: "",
   });
 
   useEffect(() => {
@@ -79,6 +86,7 @@ export default function TaskDetailPage() {
           name: response.data.name,
           instructions: response.data.instructions,
           urls: response.data.urls.join("\n"),
+          structuringInstructions: response.data.structuringInstructions || "",
         });
       }
     } catch (error) {
@@ -163,6 +171,7 @@ export default function TaskDetailPage() {
         name: editForm.name,
         instructions: editForm.instructions,
         urls: urls,
+        structuringInstructions: editForm.structuringInstructions,
       });
       setIsEditing(false);
       fetchTask();
@@ -233,11 +242,43 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleCopy = (text: string, type: "instruction" | "urls") => {
+  const handleStructure = async () => {
+    let instructions = task?.structuringInstructions;
+
+    if (!instructions) {
+      const userInput = window.prompt(
+        "Please enter data structuring instructions (e.g., 'Extract title and price'):",
+      );
+      if (userInput === null) return; // User cancelled
+      if (!userInput.trim()) {
+        alert("Instructions are required.");
+        return;
+      }
+      instructions = userInput;
+    }
+
+    try {
+      await api.post(`/api/tasks/${id}/structure`, {
+        structuringInstructions: instructions,
+      });
+      fetchTask();
+    } catch (error) {
+      console.error("Failed to structure data", error);
+      alert("Failed to structure data");
+    }
+  };
+
+  const handleCopy = (
+    text: string,
+    type: "instruction" | "urls" | "structuringInstruction",
+  ) => {
     navigator.clipboard.writeText(text);
     if (type === "instruction") {
       setCopiedInstruction(true);
       setTimeout(() => setCopiedInstruction(false), 2000);
+    } else if (type === "structuringInstruction") {
+      setCopiedStructuringInstruction(true);
+      setTimeout(() => setCopiedStructuringInstruction(false), 2000);
     } else {
       setCopiedUrls(true);
       setTimeout(() => setCopiedUrls(false), 2000);
@@ -264,9 +305,7 @@ export default function TaskDetailPage() {
   }
 
   // Filter latest vs history results
-  const latestResults =
-    task.results?.filter((r: any) => true).slice(0, task.urls?.length || 1) ||
-    [];
+  const latestResults = task.results?.slice(0, task.urls?.length || 1) || [];
 
   const historyResults = task.results?.slice(latestResults.length) || [];
 
@@ -345,6 +384,15 @@ export default function TaskDetailPage() {
                   </Button>
                 )}
 
+                {task.status === "completed" &&
+                  task.results &&
+                  task.results.length > 0 && (
+                    <Button variant="secondary" onClick={handleStructure}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Structure Data
+                    </Button>
+                  )}
+
                 {(task.status === "completed" ||
                   task.status === "failed" ||
                   task.status === "paused") && (
@@ -353,41 +401,6 @@ export default function TaskDetailPage() {
                     Restart
                   </Button>
                 )}
-
-                <div className="relative">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                    disabled={!task.results || task.results.length === 0}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                    <ChevronDown className="h-3 w-3 ml-2 opacity-70" />
-                  </Button>
-
-                  {isExportMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 animate-in fade-in zoom-in-95 duration-200">
-                      <button
-                        onClick={() => handleExport("md")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                      >
-                        Markdown (.md)
-                      </button>
-                      <button
-                        onClick={() => handleExport("excel")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                      >
-                        Excel (.xlsx)
-                      </button>
-                      <button
-                        onClick={() => handleExport("pdf")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                      >
-                        PDF (.pdf)
-                      </button>
-                    </div>
-                  )}
-                </div>
 
                 <Button variant="danger" onClick={handleDelete}>
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -465,14 +478,41 @@ export default function TaskDetailPage() {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Details */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="flex flex-col gap-6">
+          {/* Metadata/Config - Keywords moved above Instructions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Hash className="h-5 w-5 text-gray-500" />
+                Keywords
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {task.keywords ? (
+                  task.keywords.split(",").map((k, i) => (
+                    <span
+                      key={i}
+                      className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-sm"
+                    >
+                      {k.trim()}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-gray-500 text-sm">No keywords</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Details Section */}
+          <div className="space-y-6">
+            {/* Crawling Instructions Card */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FileText className="h-5 w-5 text-gray-500" />
-                  Instructions
+                  Crawling Instructions
                 </CardTitle>
                 {!isEditing && (
                   <Button
@@ -492,13 +532,20 @@ export default function TaskDetailPage() {
               </CardHeader>
               <CardContent>
                 {isEditing ? (
-                  <textarea
-                    className="w-full h-32 p-2 border rounded-md font-mono text-sm bg-white"
-                    value={editForm.instructions}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, instructions: e.target.value })
-                    }
-                  />
+                  <div className="space-y-4">
+                    <div>
+                      <textarea
+                        className="w-full h-32 p-2 border rounded-md font-mono text-sm bg-white"
+                        value={editForm.instructions}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            instructions: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap font-mono">
                     {task.instructions}
@@ -506,6 +553,59 @@ export default function TaskDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Structuring Instructions Card */}
+            {(isEditing || task.structuringInstructions) && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Settings className="h-5 w-5 text-gray-500" />
+                    Data Structuring Instructions
+                  </CardTitle>
+                  {!isEditing && task.structuringInstructions && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        handleCopy(
+                          task.structuringInstructions || "",
+                          "structuringInstruction",
+                        )
+                      }
+                      className="text-gray-500 hover:text-gray-900"
+                      title="Copy Structuring Instructions"
+                    >
+                      {copiedStructuringInstruction ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {isEditing ? (
+                    <div>
+                      <textarea
+                        className="w-full h-24 p-2 border rounded-md font-mono text-sm bg-white"
+                        value={editForm.structuringInstructions}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            structuringInstructions: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Extract fields: title, date, author..."
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-900 border border-blue-100 whitespace-pre-wrap font-mono">
+                      {task.structuringInstructions}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader
@@ -582,10 +682,27 @@ export default function TaskDetailPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5 text-gray-500" />
-                  Latest Results
-                </CardTitle>
+                <div className="flex items-center gap-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Settings className="h-5 w-5 text-gray-500" />
+                    Latest Results
+                  </CardTitle>
+                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button
+                      onClick={() => setActiveTab("list")}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${activeTab === "list" ? "bg-white shadow text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      List
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("table")}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${activeTab === "table" ? "bg-white shadow text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Table
+                    </button>
+                  </div>
+                </div>
+
                 {task.results && task.results.length > 0 && (
                   <Button
                     variant="ghost"
@@ -600,50 +717,72 @@ export default function TaskDetailPage() {
               </CardHeader>
               <CardContent>
                 {latestResults.length > 0 ? (
-                  <div className="space-y-4">
-                    {latestResults.map((result: any, index: number) => (
-                      <ResultItem
-                        key={result.id || index}
-                        result={result}
-                        onDelete={() => handleDeleteResult(result.id)}
-                        onClick={() => setSelectedResult(result)}
-                      />
-                    ))}
+                  activeTab === "list" ? (
+                    <div className="space-y-4">
+                      {latestResults.map(
+                        (result: TaskResult, index: number) => (
+                          <ResultItem
+                            key={result.id || index}
+                            result={result}
+                            onDelete={() => handleDeleteResult(result.id)}
+                            onClick={() => setSelectedResult(result)}
+                          />
+                        ),
+                      )}
 
-                    {historyResults.length > 0 && (
-                      <div className="mt-6 pt-4 border-t">
-                        <button
-                          onClick={() => setShowHistory(!showHistory)}
-                          className="flex items-center text-sm text-gray-500 hover:text-gray-900 w-full justify-between"
-                        >
-                          <span>
-                            History ({historyResults.length} older items)
-                          </span>
-                          {showHistory ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        {showHistory && (
-                          <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2">
-                            {historyResults.map(
-                              (result: any, index: number) => (
-                                <ResultItem
-                                  key={result.id || `hist-${index}`}
-                                  result={result}
-                                  isHistory
-                                  onDelete={() => handleDeleteResult(result.id)}
-                                  onClick={() => setSelectedResult(result)}
-                                />
-                              ),
+                      {historyResults.length > 0 && (
+                        <div className="mt-6 pt-4 border-t">
+                          <button
+                            onClick={() => setShowHistory(!showHistory)}
+                            className="flex items-center text-sm text-gray-500 hover:text-gray-900 w-full justify-between"
+                          >
+                            <span>
+                              History ({historyResults.length} older items)
+                            </span>
+                            {showHistory ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
                             )}
-                          </div>
-                        )}
+                          </button>
+
+                          {showHistory && (
+                            <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2">
+                              {historyResults.map(
+                                (result: TaskResult, index: number) => (
+                                  <ResultItem
+                                    key={result.id || `hist-${index}`}
+                                    result={result}
+                                    isHistory
+                                    onDelete={() =>
+                                      handleDeleteResult(result.id)
+                                    }
+                                    onClick={() => setSelectedResult(result)}
+                                  />
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsTableModalOpen(true)}
+                        >
+                          <Maximize2 className="h-4 w-4 mr-2" />
+                          Full Screen & Export
+                        </Button>
                       </div>
-                    )}
-                  </div>
+                      <div className="max-h-[500px] overflow-auto border rounded-lg">
+                        <ResultsTable results={latestResults} />
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
                     {task.status === "running" ? (
@@ -659,36 +798,70 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Right Column: Metadata/Config */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Hash className="h-5 w-5 text-gray-500" />
-                  Keywords
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {task.keywords ? (
-                    task.keywords.split(",").map((k, i) => (
-                      <span
-                        key={i}
-                        className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-sm"
-                      >
-                        {k.trim()}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-500 text-sm">No keywords</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
+
+      {/* Table View Modal */}
+      {isTableModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsTableModalOpen(false)}
+          ></div>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold text-gray-900">
+                Structured Data Table
+              </h2>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                    disabled={!task.results || task.results.length === 0}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                    <ChevronDown className="h-3 w-3 ml-2 opacity-70" />
+                  </Button>
+
+                  {isExportMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 animate-in fade-in zoom-in-95 duration-200">
+                      <button
+                        onClick={() => handleExport("md")}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        Markdown (.md)
+                      </button>
+                      <button
+                        onClick={() => handleExport("excel")}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        Excel (.xlsx)
+                      </button>
+                      <button
+                        onClick={() => handleExport("pdf")}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        PDF (.pdf)
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsTableModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <ResultsTable results={latestResults} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drawer Component */}
       {selectedResult && (
@@ -721,12 +894,12 @@ export default function TaskDetailPage() {
                   <span className="font-medium">Source URL:</span>
                 </div>
                 <a
-                  href={selectedResult.data?.url}
+                  href={selectedResult.data.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline break-all text-sm block"
                 >
-                  {selectedResult.data?.url}
+                  {selectedResult.data.url}
                 </a>
                 <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
                   <Clock className="h-4 w-4" />
@@ -738,7 +911,7 @@ export default function TaskDetailPage() {
               </div>
 
               {/* Summary */}
-              {selectedResult.data?.summary && (
+              {selectedResult.data.summary && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                     <FileText className="h-5 w-5 text-gray-500" />
@@ -746,6 +919,19 @@ export default function TaskDetailPage() {
                   </h3>
                   <div className="bg-blue-50 p-4 rounded-lg text-gray-800 leading-relaxed text-sm">
                     {selectedResult.data.summary}
+                  </div>
+                </div>
+              )}
+
+              {/* Structured Data */}
+              {selectedResult.structuredData && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                    <Settings className="h-5 w-5 text-purple-600" />
+                    Structured Data (AI)
+                  </h3>
+                  <div className="bg-purple-50 text-purple-900 rounded-lg overflow-x-auto border border-purple-100">
+                    <ResultsTable results={[selectedResult]} />
                   </div>
                 </div>
               )}
@@ -790,8 +976,8 @@ export default function TaskDetailPage() {
               })()}
 
               {/* List Items */}
-              {selectedResult.data?.type === "list_crawl" &&
-                selectedResult.data?.items && (
+              {selectedResult.data.type === "list_crawl" &&
+                selectedResult.data.items && (
                   <div>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                       <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs">
@@ -800,63 +986,61 @@ export default function TaskDetailPage() {
                       Extracted Items
                     </h3>
                     <div className="space-y-4">
-                      {selectedResult.data.items.map(
-                        (item: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="border border-blue-100 rounded-lg p-4 bg-blue-50/50 hover:bg-blue-50 transition-colors"
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-xs font-mono text-blue-500">
-                                #{idx + 1}
-                              </span>
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                className="text-xs text-gray-400 hover:text-blue-600"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            </div>
-                            <h4 className="font-medium text-blue-900 mb-2">
-                              {item.title || "Untitled Item"}
-                            </h4>
-
-                            {item.content && (
-                              <div className="text-sm text-gray-600 mb-3 line-clamp-4">
-                                {item.content}
-                              </div>
-                            )}
-
-                            <div className="grid gap-2">
-                              {Object.entries(item).map(([k, v]) => {
-                                if (
-                                  [
-                                    "url",
-                                    "title",
-                                    "content",
-                                    "timestamp",
-                                  ].includes(k)
-                                )
-                                  return null;
-                                return (
-                                  <div
-                                    key={k}
-                                    className="text-xs bg-white p-2 rounded border border-blue-100"
-                                  >
-                                    <span className="font-semibold text-gray-600 mr-2">
-                                      {k}:
-                                    </span>
-                                    <span className="text-gray-800">
-                                      {String(v)}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                      {selectedResult.data.items.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="border border-blue-100 rounded-lg p-4 bg-blue-50/50 hover:bg-blue-50 transition-colors"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs font-mono text-blue-500">
+                              #{idx + 1}
+                            </span>
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              className="text-xs text-gray-400 hover:text-blue-600"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           </div>
-                        ),
-                      )}
+                          <h4 className="font-medium text-blue-900 mb-2">
+                            {item.title || "Untitled Item"}
+                          </h4>
+
+                          {item.content && (
+                            <div className="text-sm text-gray-600 mb-3 line-clamp-4">
+                              {item.content}
+                            </div>
+                          )}
+
+                          <div className="grid gap-2">
+                            {Object.entries(item).map(([k, v]) => {
+                              if (
+                                [
+                                  "url",
+                                  "title",
+                                  "content",
+                                  "timestamp",
+                                ].includes(k)
+                              )
+                                return null;
+                              return (
+                                <div
+                                  key={k}
+                                  className="text-xs bg-white p-2 rounded border border-blue-100"
+                                >
+                                  <span className="font-semibold text-gray-600 mr-2">
+                                    {k}:
+                                  </span>
+                                  <span className="text-gray-800">
+                                    {String(v)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -881,13 +1065,134 @@ export default function TaskDetailPage() {
   );
 }
 
+function ResultsTable({ results }: { results: TaskResult[] }) {
+  // Flatten data for the table
+  const tableData = React.useMemo(() => {
+    const flattened: Record<string, unknown>[] = [];
+    results.forEach((r) => {
+      const sourceData = (r.structuredData || r.data || {}) as
+        | Record<string, unknown>
+        | { items: Record<string, unknown>[] };
+      const baseInfo = {
+        _source_url: r.data?.url,
+        _created_at: r.createdAt,
+      };
+
+      if (Array.isArray(sourceData)) {
+        sourceData.forEach((item) => {
+          flattened.push({ ...(item as Record<string, unknown>), ...baseInfo });
+        });
+      } else if ("items" in sourceData && Array.isArray(sourceData.items)) {
+        sourceData.items.forEach((item: Record<string, unknown>) => {
+          flattened.push({ ...item, ...baseInfo });
+        });
+      } else {
+        flattened.push({
+          ...(sourceData as Record<string, unknown>),
+          ...baseInfo,
+        });
+      }
+    });
+    return flattened;
+  }, [results]);
+
+  if (tableData.length === 0) {
+    return (
+      <div className="text-center py-4 text-gray-500">
+        No data available for table view
+      </div>
+    );
+  }
+
+  // Collect all keys for columns
+  const allKeys = Array.from(
+    new Set(
+      tableData.flatMap((item) =>
+        Object.keys(item).filter(
+          (k) =>
+            ![
+              "_source_url",
+              "_created_at",
+              "items",
+              "type",
+              "summary",
+              "content",
+            ].includes(k),
+        ),
+      ),
+    ),
+  );
+
+  // Ensure we have some columns, if not, show raw keys
+  const columns = allKeys.length > 0 ? allKeys : ["title", "url"];
+
+  return (
+    <div className="overflow-x-auto border rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              #
+            </th>
+            {columns.map((key) => (
+              <th
+                key={key}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+              >
+                {key}
+              </th>
+            ))}
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Source
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {tableData.map((row, idx) => (
+            <tr key={idx} className="hover:bg-gray-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {idx + 1}
+              </td>
+              {columns.map((key) => (
+                <td
+                  key={key}
+                  className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate"
+                  title={
+                    typeof row[key] === "object"
+                      ? JSON.stringify(row[key])
+                      : String(row[key])
+                  }
+                >
+                  {typeof row[key] === "object"
+                    ? JSON.stringify(row[key])
+                    : String(row[key] || "-")}
+                </td>
+              ))}
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-500">
+                <a
+                  href={row._source_url as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline flex items-center gap-1"
+                >
+                  Link <ExternalLink className="h-3 w-3" />
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ResultItem({
   result,
   isHistory,
   onDelete,
   onClick,
 }: {
-  result: any;
+  result: TaskResult;
   isHistory?: boolean;
   onDelete: () => void;
   onClick: () => void;
@@ -905,112 +1210,185 @@ function ResultItem({
   } = result.data || {};
   const hasOtherData = Object.keys(otherData).length > 0;
 
+  // Format structured data preview
+  const structuredPreview = result.structuredData
+    ? Array.isArray(result.structuredData)
+      ? result.structuredData
+      : result.structuredData.items &&
+          Array.isArray(result.structuredData.items)
+        ? result.structuredData.items
+        : result.structuredData
+    : null;
+  const isStructuredArray = Array.isArray(structuredPreview);
+
   return (
     <div
       onClick={onClick}
-      className={`border rounded-lg p-4 bg-white shadow-sm group relative cursor-pointer hover:shadow-md transition-shadow ${isHistory ? "opacity-75 bg-gray-50" : ""}`}
+      className={`border rounded-lg p-0 bg-white shadow-sm group relative cursor-pointer hover:shadow-md transition-shadow ${isHistory ? "opacity-75 bg-gray-50" : ""} overflow-hidden`}
     >
+      <div className="flex flex-col md:flex-row h-full">
+        {/* Left Side: Original Scraped Data */}
+        <div
+          className={`p-4 ${result.structuredData ? "w-full md:w-1/2 border-b md:border-b-0 md:border-r border-gray-100" : "w-full"} min-w-0`}
+        >
+          <div className="flex justify-between items-start mb-3">
+            <div className="w-full min-w-0">
+              <div className="flex items-center gap-2 mb-1 justify-between">
+                <h4 className="font-medium text-gray-900 text-sm line-clamp-1 truncate">
+                  {title || "Result Data"}
+                </h4>
+                <span className="text-xs text-gray-400 whitespace-nowrap ml-2 flex-shrink-0">
+                  {new Date(result.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+              <a
+                href={url}
+                onClick={(e) => e.stopPropagation()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline flex items-center gap-1 mb-2 truncate max-w-full"
+              >
+                <span className="truncate">{url}</span>
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            </div>
+          </div>
+
+          {summary && (
+            <div className="bg-gray-50 p-3 rounded text-sm text-gray-700 mb-3 border border-gray-100 line-clamp-3">
+              {summary}
+            </div>
+          )}
+
+          {!summary && hasOtherData && (
+            <div className="text-xs text-gray-500 italic truncate">
+              Raw data contains {Object.keys(otherData).length} extracted
+              fields.
+            </div>
+          )}
+
+          {/* List Crawl Results Display - Preview */}
+          {type === "list_crawl" && items && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-500 mb-2">
+                Extracted Items ({items_found || items.length}):
+              </p>
+              <div className="space-y-1">
+                {items.slice(0, 3).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-blue-50 px-2 py-1 rounded text-xs border border-blue-100 truncate text-blue-700"
+                  >
+                    {item.title || item.url}
+                  </div>
+                ))}
+                {items.length > 3 && (
+                  <p className="text-xs text-gray-400 text-center">
+                    + {items.length - 3} more items
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: AI Structured Data */}
+        {result.structuredData && (
+          <div className="p-4 w-full md:w-1/2 bg-purple-50/30">
+            <div className="flex items-center gap-2 mb-3">
+              <Settings className="h-4 w-4 text-purple-600" />
+              <h4 className="font-semibold text-purple-900 text-sm">
+                AI Structured Data
+              </h4>
+            </div>
+
+            <div className="space-y-2">
+              {isStructuredArray ? (
+                <div className="space-y-2">
+                  {(structuredPreview as Record<string, unknown>[])
+                    .slice(0, 3)
+                    .map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white p-2 rounded border border-purple-100 text-xs shadow-sm"
+                      >
+                        {Object.entries(item)
+                          .slice(0, 2)
+                          .map(([k, v]) => (
+                            <div
+                              key={k}
+                              className="flex gap-1 mb-0.5 w-full items-center"
+                            >
+                              <span
+                                className="font-medium text-purple-800 whitespace-nowrap flex-shrink-0 max-w-[40%] truncate"
+                                title={k}
+                              >
+                                {k}:
+                              </span>
+                              <span
+                                className="text-gray-700 truncate flex-1 min-w-0"
+                                title={String(v)}
+                              >
+                                {String(v)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    ))}
+                  {(structuredPreview as Record<string, unknown>[]).length >
+                    3 && (
+                    <p className="text-xs text-purple-400 text-center">
+                      +{" "}
+                      {(structuredPreview as Record<string, unknown>[]).length -
+                        3}{" "}
+                      items
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white p-3 rounded border border-purple-100 text-xs shadow-sm space-y-1">
+                  {Object.entries(structuredPreview as object)
+                    .slice(0, 5)
+                    .map(([k, v]) => (
+                      <div
+                        key={k}
+                        className="grid grid-cols-3 gap-2 items-center w-full"
+                      >
+                        <span
+                          className="font-medium text-purple-800 col-span-1 truncate"
+                          title={k}
+                        >
+                          {k}:
+                        </span>
+                        <span
+                          className="text-gray-700 col-span-2 truncate min-w-0"
+                          title={String(v)}
+                        >
+                          {String(v)}
+                        </span>
+                      </div>
+                    ))}
+                  {Object.keys(structuredPreview as object).length > 5 && (
+                    <p className="text-center text-gray-400 pt-1">...</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50"
+          className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 bg-white shadow-sm border"
           title="Delete result"
         >
           <Trash2 className="h-4 w-4" />
         </button>
-      </div>
-
-      <div className="flex justify-between items-start mb-3 pr-6">
-        <div>
-          <h4 className="font-medium text-gray-900 text-sm mb-1 line-clamp-1">
-            {title || "Result Data"}
-          </h4>
-          <a
-            href={url}
-            onClick={(e) => e.stopPropagation()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-          >
-            {url} <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-          {new Date(result.createdAt).toLocaleTimeString()}
-        </span>
-      </div>
-
-      {summary && (
-        <div className="bg-gray-50 p-3 rounded text-sm text-gray-700 mb-3 border border-gray-100 line-clamp-3">
-          {summary}
-        </div>
-      )}
-
-      {/* Dynamic JSON Data Display - Preview only */}
-      {hasOtherData && (
-        <div className="mb-3 grid gap-2">
-          {Object.entries(otherData)
-            .slice(0, 2)
-            .map(([key, value]) => (
-              <div
-                key={key}
-                className="bg-gray-50 p-2 rounded border border-gray-100"
-              >
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
-                  {key.replace(/_/g, " ")}
-                </span>
-                <div className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
-                  {typeof value === "string" ? value : JSON.stringify(value)}
-                </div>
-              </div>
-            ))}
-          {Object.keys(otherData).length > 2 && (
-            <p className="text-xs text-gray-400 text-center">
-              + {Object.keys(otherData).length - 2} more fields
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* List Crawl Results Display - Preview */}
-      {type === "list_crawl" && items && (
-        <div className="mb-3">
-          <p className="text-xs font-medium text-gray-500 mb-2">
-            Extracted Items ({items_found || items.length}):
-          </p>
-          <div className="space-y-2">
-            {items.slice(0, 2).map((item: any, idx: number) => (
-              <div
-                key={idx}
-                className="bg-blue-50 p-2 rounded text-sm border border-blue-100 truncate"
-              >
-                <span className="text-blue-700 font-medium">
-                  {item.title || item.url}
-                </span>
-              </div>
-            ))}
-            {items.length > 2 && (
-              <p className="text-xs text-gray-400 text-center">
-                + {items.length - 2} more items
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {result.errorMessage && (
-        <div className="text-red-600 text-sm mb-2 bg-red-50 p-2 rounded border border-red-100">
-          Error: {result.errorMessage}
-        </div>
-      )}
-
-      <div className="mt-2 text-center">
-        <span className="text-xs text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          Click to view details
-        </span>
       </div>
     </div>
   );

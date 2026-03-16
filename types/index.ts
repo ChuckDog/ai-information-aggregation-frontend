@@ -1,3 +1,25 @@
+export interface ScrapedData {
+  url?: string;
+  title?: string;
+  summary?: string;
+  content?: string;
+  type?: string;
+  items?: ScrapedData[];
+  timestamp?: string;
+  items_found?: number;
+  [key: string]: unknown;
+}
+
+export interface TaskResult {
+  id: string;
+  taskId: string;
+  data: ScrapedData;
+  structuredData?: Record<string, unknown>;
+  status: string;
+  errorMessage?: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -5,14 +27,16 @@ export interface Task {
   urls: string[];
   keywords: string;
   instructions: string;
-  config: any;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
+  structuringInstructions?: string;
+  structuringSchema?: Record<string, unknown>;
+  config: Record<string, unknown>;
+  status: "pending" | "running" | "completed" | "failed" | "paused";
   progress?: number;
   current_step?: string;
   createdAt: string;
   updatedAt: string;
   executedAt?: string;
-  results?: any[];
+  results?: TaskResult[];
 }
 
 export interface CreateTaskDto {
@@ -20,5 +44,6 @@ export interface CreateTaskDto {
   urls?: string[];
   keywords?: string;
   instructions: string;
-  config?: any;
+  structuringInstructions?: string;
+  config?: Record<string, unknown>;
 }
