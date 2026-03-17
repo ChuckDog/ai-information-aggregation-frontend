@@ -33,6 +33,8 @@ export interface Task {
   status: "pending" | "running" | "completed" | "failed" | "paused";
   progress?: number;
   current_step?: string;
+  isScheduled?: boolean;
+  cronExpression?: string;
   createdAt: string;
   updatedAt: string;
   executedAt?: string;
@@ -46,4 +48,7 @@ export interface CreateTaskDto {
   instructions: string;
   structuringInstructions?: string;
   config?: Record<string, unknown>;
+  isScheduled?: boolean;
+  cronExpression?: string;
+  scheduleDescription?: string;
 }

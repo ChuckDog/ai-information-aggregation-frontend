@@ -124,6 +124,45 @@ export default function NewTaskPage() {
                 {...register("keywords")}
               />
 
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-900">
+                  Scheduling (Optional)
+                </h3>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="isScheduled"
+                    {...register("isScheduled")}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label
+                    htmlFor="isScheduled"
+                    className="ml-2 block text-sm text-gray-900"
+                  >
+                    Enable automatic scheduling
+                  </label>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Schedule Description
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Describe when you want the task to run naturally.
+                    <br />
+                    e.g., "Every day at 9 AM", "Every Monday morning", "Once an
+                    hour"
+                  </p>
+                  <Input
+                    placeholder="e.g., Every day at 9 AM"
+                    {...register("scheduleDescription")}
+                  />
+                  {/* Hidden cron input if we still want to support manual override or just use backend generation */}
+                  {/* For now, let's rely on backend generation based on description */}
+                </div>
+              </div>
+
               <div className="pt-4 flex justify-end gap-4">
                 <Link href="/">
                   <Button type="button" variant="secondary">

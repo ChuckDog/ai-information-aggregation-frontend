@@ -145,6 +145,14 @@ export default function TaskDashboard({
                       title={task.name}
                     >
                       {task.name}
+                      {task.isScheduled && (
+                        <span
+                          className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"
+                          title={`Scheduled: ${task.cronExpression}`}
+                        >
+                          Scheduled
+                        </span>
+                      )}
                     </CardTitle>
                     <StatusBadge status={task.status} />
                   </div>
